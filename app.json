@@ -40,6 +40,14 @@
             "backgroundColor": "#000000"
           }
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "ndkVersion": "28.2.13676358"
+          }
+        }
       ]
     ],
     "experiments": {
