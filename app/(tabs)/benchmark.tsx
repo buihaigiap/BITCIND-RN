@@ -1,224 +1,271 @@
-import { BenchmarkResult, getCpuCoreCount, runMultiThreadedBenchmark } from 'expo-benchmark';
-import { LinearGradient } from 'expo-linear-gradient';
-import React, { useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
-export const Benchmark = ({setShowWebView  , setBenchmarkResult} : any) => {
-    const [result, setResult] = useState<BenchmarkResult | null>(null);
-    const [isRunning, setIsRunning] = useState(false);
-    const [isModalVisible, setIsModalVisible] = useState(false);
-    const handleMultiThreadedBenchmark = async () => {
-    if (isRunning) return;
+import { getCpuCoreCount, runMultiThreadedBenchmark } from 'expo-benchmark';
+import { Activity, Cpu, ShieldCheck, Zap } from 'lucide-react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import BenchmarkModal from './BenchmarkModal';
 
-    setIsRunning(true);
-    setResult(null);
+enum BenchmarkState {
+  IDLE = 'IDLE',
+  RUNNING = 'RUNNING',
+  COMPLETED = 'COMPLETED',
+}
+
+export const Benchmark = ({ setShowWebView, setBenchmarkResult }: any) => {
+  const [status, setStatus] = useState<BenchmarkState>(BenchmarkState.IDLE);
+  const [modalResult, setModalResult] = useState<any | null>(null);
+  const [progress, setProgress] = useState(0);
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const rotateAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (status === BenchmarkState.RUNNING) {
+      Animated.loop(
+        Animated.timing(rotateAnim, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: true,
+        })
+      ).start();
+    } else {
+      rotateAnim.stopAnimation();
+      rotateAnim.setValue(0);
+    }
+  }, [status]);
+
+  const runBenchmark = async () => {
+    if (status === BenchmarkState.RUNNING) return;
+
+    setStatus(BenchmarkState.RUNNING);
+    setProgress(0);
     setShowWebView(false);
-  try {
-    const benchmarkResult = await runMultiThreadedBenchmark(5);
-    setResult(benchmarkResult);
-    setBenchmarkResult({
-      kiloHashesPerSecond: benchmarkResult.kiloHashesPerSecond,
-      megaHashesPerSecond: benchmarkResult.megaHashesPerSecond,
-      threads: getCpuCoreCount(),
-      timestamp: Date.now(),
-    });
 
-    // Hiện modal kết quả
-    setIsModalVisible(true);
+    // Animate progress
+    Animated.timing(progressAnim, {
+      toValue: 100,
+      duration: 5000,
+      useNativeDriver: false,
+    }).start();
 
-    // Sau 3 giây thì đóng modal & mở WebView
-    setTimeout(() => {
-      setIsModalVisible(false);
-      setShowWebView(true);
-    }, 3000);
-  } catch (error) {
-    console.error('❌ Benchmark error:', error);
-  } finally {
-    setIsRunning(false);
-  }
-};
+    // Update progress percentage
+    const progressInterval = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 100) {
+          clearInterval(progressInterval);
+          return 100;
+        }
+        return prev + 2;
+      });
+    }, 100);
+
+    try {
+      const benchmarkResult = await runMultiThreadedBenchmark(5);
+      clearInterval(progressInterval);
+      setProgress(100);
+      
+      setBenchmarkResult({
+        kiloHashesPerSecond: benchmarkResult.kiloHashesPerSecond,
+        megaHashesPerSecond: benchmarkResult.megaHashesPerSecond,
+        threads: getCpuCoreCount(),
+        timestamp: Date.now(),
+      });
+
+      // Transform result for BenchmarkModal
+      setModalResult({
+        MH: benchmarkResult.megaHashesPerSecond,
+        KH: benchmarkResult.kiloHashesPerSecond,
+        duration: benchmarkResult.durationMs,
+        threads: benchmarkResult.threads,
+        cpuScore: getCpuCoreCount(),
+        deviceInfo: {
+          platform: Platform.OS === 'ios' ? 'iOS' : Platform.OS === 'android' ? 'Android' : 'Unknown',
+          cores: getCpuCoreCount(),
+        },
+      });
+
+      setStatus(BenchmarkState.COMPLETED);
+
+      setTimeout(() => {
+        setShowWebView(true);
+      }, 300000);
+    } catch (error) {
+      console.error('❌ Benchmark error:', error);
+      clearInterval(progressInterval);
+      setStatus(BenchmarkState.IDLE);
+      setProgress(0);
+      progressAnim.setValue(0);
+    }
+  };
+
+  const reset = () => {
+    setStatus(BenchmarkState.IDLE);
+    setModalResult(null);
+    setProgress(0);
+    progressAnim.setValue(0);
+  };
 
   const formatNumber = (num: number) =>
     num.toLocaleString(undefined, { maximumFractionDigits: 2 });
 
-    return (
-        <LinearGradient colors={['#1e3c72', '#2a5298']} style={styles.container}>
-              <SafeAreaView style={styles.safeArea}>
-                <View style={styles.content}>
-                  <Text style={styles.title}>Hashrate Benchmark</Text>
-                  <Text style={styles.subtitle}>Test your device's performance</Text>
-        
-                  <View style={styles.infoCard}>
-                    <Text style={styles.infoText}>CPU Cores: {getCpuCoreCount()}</Text>
-                  </View>
-        
-                  <Pressable
-                    style={[styles.runButton, isRunning && styles.buttonDisabled]}
-                    onPress={handleMultiThreadedBenchmark}
-                    disabled={isRunning}
-                  >
-                    {isRunning ? (
-                      <ActivityIndicator size="large" color="#fff" />
-                    ) : (
-                      <Text style={styles.buttonText}>Start Benchmark</Text>
-                    )}
-                  </Pressable>
-                </View>
-        
-                <Modal
-                  animationType="slide"
-                  transparent={true}
-                  visible={isModalVisible}
-                  onRequestClose={() => {
-                    setIsModalVisible(!isModalVisible);
-                  }}
-                >
-                  <View style={styles.centeredView}>
-                    <View style={styles.modalView}>
-                      <Text style={styles.modalTitle}>Benchmark Complete!</Text>
-                      {result && (
-                        <>
-                          <View style={styles.modalResultCard}>
-                            <Text style={styles.resultValue}>{formatNumber(result.kiloHashesPerSecond)}</Text>
-                            <Text style={styles.resultUnit}>KH/s</Text>
-                          </View>
-                          <View style={styles.modalResultCard}>
-                            <Text style={styles.resultValue}>{formatNumber(result.megaHashesPerSecond)}</Text>
-                            <Text style={styles.resultUnit}>MH/s</Text>
-                          </View>
-                        </>
-                      )}
-                      <Text style={styles.redirectText}>Redirecting to web view in 3 seconds...</Text>
-                    </View>
-                  </View>
-                </Modal>
-              </SafeAreaView>
-        </LinearGradient>
-    )
+  const rotate = rotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  return (
+    <View style={styles.container}>
+      {/* Logo */}
+      <Animated.View style={[styles.logoBox, { transform: [{ rotate }] }]}>
+        <Cpu size={48} color="#60a5fa" />
+      </Animated.View>
+
+      <Text style={styles.title}>Benchmark Pro</Text>
+      <Text style={styles.subtitle}>
+        Test your device's raw performance with our advanced computing engine.
+      </Text>
+
+      {/* Stats */}
+      <View style={styles.statsRow}>
+        <Stat icon={Zap} label="CPU Speed" value="High" />
+        <Stat icon={Activity} label="GPU Load" value="Normal" />
+        <Stat icon={ShieldCheck} label="Security" value="Safe" />
+      </View>
+
+      {/* Button / Progress */}
+      {status !== BenchmarkState.RUNNING ? (
+        <TouchableOpacity style={styles.button} onPress={runBenchmark}>
+          <Zap size={18} color="#000" />
+          <Text style={styles.buttonText}>
+            {status === BenchmarkState.IDLE ? 'Start New Benchmark' : 'Run Again'}
+          </Text>
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.progressBox}>
+          <Text style={styles.progressTitle}>Running calculations...</Text>
+          <Text style={styles.progressPercent}>{progress}%</Text>
+
+          <View style={styles.progressBarBg}>
+            <Animated.View
+              style={[
+                styles.progressBar,
+                {
+                  width: progressAnim.interpolate({
+                    inputRange: [0, 100],
+                    outputRange: ['0%', '100%'],
+                  }),
+                },
+              ]}
+            />
+          </View>
+        </View>
+      )}
+
+      {/* Result Modal */}
+      {modalResult && (
+        <BenchmarkModal
+          visible={status === BenchmarkState.COMPLETED}
+          results={modalResult}
+          onClose={reset}
+        />
+      )}
+    </View>
+  );
+};
+
+function Stat({ icon: Icon, label, value }: any) {
+  return (
+    <View style={styles.stat}>
+      <Icon size={35} color="#60a5fa" />
+      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={styles.statValue}>{value}</Text>
+    </View>
+  );
 }
+
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
+    backgroundColor: '#07121ef7',
     alignItems: 'center',
-    padding: 20,
+    justifyContent: 'center',
+  },
+  logoBox: {
+    width: 96,
+    height: 96,
+    borderRadius: 24,
+    backgroundColor: '#020617',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
   },
   title: {
-    fontSize: 36,
+    fontSize: 35,
     fontWeight: 'bold',
     color: '#fff',
-    textAlign: 'center',
   },
   subtitle: {
+    color: '#94a3b8',
     fontSize: 18,
-    color: 'rgba(255, 255, 255, 0.8)',
+    marginBottom: 32,
     textAlign: 'center',
-    marginBottom: 30,
   },
-  infoCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+  statsRow: {
+    flexDirection: 'row',
+    gap: 40,
     marginBottom: 40,
   },
-  infoText: {
-    fontSize: 16,
-    color: '#fff',
-    fontWeight: '600',
-  },
-  runButton: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: '#ff9f43',
-    justifyContent: 'center',
+  stat: {
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
   },
-  buttonDisabled: {
-    backgroundColor: '#a5a5a5',
+  statLabel: {
+    fontSize: 16,
+    color: '#64748b',
+    marginTop: 4,
+  },
+  statValue: {
+    color: '#e5e7eb',
+    fontWeight: '600',
+    fontSize: 17,
+  },
+  button: {
+    width: '90%',
+    height: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+
   },
   buttonText: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  runAgainButton: {
-    marginTop: 20,
-    backgroundColor: '#ff9f43',
-    paddingVertical: 15,
-    paddingHorizontal: 40,
-    borderRadius: 30,
-  },
-  runAgainButtonText: {
-    color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
   },
-  webView: {
-    flex: 1,
-  },
-  // Modal Styles
-  centeredView: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-  },
-  modalView: {
-    margin: 20,
-    backgroundColor: 'white',
+  progressBox: {
+    width: '100%',
+    backgroundColor: '#020617',
+    padding: 20,
     borderRadius: 20,
-    padding: 35,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
   },
-  modalTitle: {
-    fontSize: 24,
+  progressTitle: {
+    color: '#fff',
     fontWeight: 'bold',
-    marginBottom: 15,
-    textAlign: 'center',
   },
-  modalResultCard: {
-    backgroundColor: '#f0f0f0',
-    borderRadius: 16,
-    padding: 15,
-    marginBottom: 10,
-    width: 250,
-    alignItems: 'center',
+  progressPercent: {
+    color: '#fff',
+    fontSize: 20,
+    alignSelf: 'flex-end',
   },
-  resultValue: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#1e3c72',
+  progressBarBg: {
+    height: 8,
+    backgroundColor: '#334155',
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginTop: 12,
   },
-  resultUnit: {
-    fontSize: 18,
-    color: '#2a5298',
-    fontWeight: '600',
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#3b82f6',
   },
-  redirectText: {
-    marginTop: 15,
-    fontSize: 16,
-    fontStyle: 'italic',
-    color: '#666',
-  }
 });
