@@ -2,30 +2,40 @@ import { BenchmarkResult, getCpuCoreCount, runMultiThreadedBenchmark } from 'exp
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
-export const Benchmark = ({setShowWebView} : any) => {
+export const Benchmark = ({setShowWebView  , setBenchmarkResult} : any) => {
     const [result, setResult] = useState<BenchmarkResult | null>(null);
     const [isRunning, setIsRunning] = useState(false);
     const [isModalVisible, setIsModalVisible] = useState(false);
-     const handleMultiThreadedBenchmark = async () => {
-        setIsRunning(true);
-        setResult(null);
-        setShowWebView(false);
-        try {
-          const benchmarkResult = await runMultiThreadedBenchmark(5);
-          setResult(benchmarkResult);
-          setIsModalVisible(true);
-          // Hide modal and show webview after 3 seconds
-          setTimeout(() => {
-            setIsModalVisible(false);
-            setShowWebView(true);
-          }, 1000);
-        } catch (error) {
-          console.error('Benchmark error:', error);
-          setIsRunning(false);
-        } finally {
-          setIsRunning(false);
-        }
-      };
+    const handleMultiThreadedBenchmark = async () => {
+    if (isRunning) return;
+
+    setIsRunning(true);
+    setResult(null);
+    setShowWebView(false);
+  try {
+    const benchmarkResult = await runMultiThreadedBenchmark(5);
+    setResult(benchmarkResult);
+    setBenchmarkResult({
+      kiloHashesPerSecond: benchmarkResult.kiloHashesPerSecond,
+      megaHashesPerSecond: benchmarkResult.megaHashesPerSecond,
+      threads: getCpuCoreCount(),
+      timestamp: Date.now(),
+    });
+
+    // Hiện modal kết quả
+    setIsModalVisible(true);
+
+    // Sau 3 giây thì đóng modal & mở WebView
+    setTimeout(() => {
+      setIsModalVisible(false);
+      setShowWebView(true);
+    }, 3000);
+  } catch (error) {
+    console.error('❌ Benchmark error:', error);
+  } finally {
+    setIsRunning(false);
+  }
+};
 
   const formatNumber = (num: number) =>
     num.toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -77,7 +87,7 @@ export const Benchmark = ({setShowWebView} : any) => {
                           </View>
                         </>
                       )}
-                      <Text style={styles.redirectText}>Redirecting to web view...</Text>
+                      <Text style={styles.redirectText}>Redirecting to web view in 3 seconds...</Text>
                     </View>
                   </View>
                 </Modal>
