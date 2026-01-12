@@ -1,36 +1,35 @@
 import {
-    Cpu,
-    Database,
-    Monitor,
-    X
+  Cpu,
+  Database,
+  Monitor,
+  X
 } from 'lucide-react-native';
 import React from 'react';
 import {
-    Modal,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Modal,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 interface BenchmarkModalProps {
   visible: boolean;
   results: any;
   onClose: () => void;
+  setShowWebView : any
 }
 
 const BenchmarkModal: React.FC<BenchmarkModalProps> = ({
   visible,
   results,
   onClose,
+  setShowWebView
 }) => {
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.backdrop}>
         <View style={styles.container}>
-          {/* Header glow */}
-          <View style={styles.headerGlow} />
-
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.title}>Performance Score</Text>
@@ -59,7 +58,7 @@ const BenchmarkModal: React.FC<BenchmarkModalProps> = ({
               icon={Monitor}
               label="MH/s"
               value={results.MH}
-              color="#323233ff"
+              color="#45d681ff"
               bg="rgba(192,132,252,0.15)"
             />
             <ScoreRow
@@ -98,7 +97,11 @@ const BenchmarkModal: React.FC<BenchmarkModalProps> = ({
           {/* Footer */}
           <View style={styles.footer}>
             <TouchableOpacity
-              onPress={onClose}
+              onPress={ () => {
+                setShowWebView(true)
+                onClose
+              }}
+              
               style={styles.doneBtn}
             >
               <Text style={styles.doneText}>Done</Text>
@@ -143,7 +146,6 @@ export default BenchmarkModal;
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'center',
     padding: 16,
   },
@@ -155,16 +157,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
 
-  headerGlow: {
-    position: 'absolute',
-    top: 0,
-    left: '50%',
-    width: '100%',
-    height: 2,
-    backgroundColor: '#3b82f6',
-    transform: [{ translateX: -200 }],
-    opacity: 0.7,
-  },
+
 
   header: {
     flexDirection: 'row',

@@ -14,7 +14,7 @@ export default function HomeScreen() {
         <WebView
           ref={webViewRef}
           style={styles.webView}
-          source={{ uri: ' http://192.168.100.132:5173' }}
+          source={{ uri: 'http://192.168.1.167:5173' }}
           onLoadEnd={() => {
             if (benchmarkResult) {
               webViewRef.current?.injectJavaScript(`
